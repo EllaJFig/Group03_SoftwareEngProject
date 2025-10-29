@@ -82,14 +82,3 @@ with col2:
     )
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-# Footer
-colA, colB, colC = st.columns(3)
-
-with colA:
-    if st.button("🗺 Map"):
-        st.write("Navigating to Map Page...")
-
-with colB:
-    if st.button("👤 Profile"):
-        st.write("Navigating to Profile Page...")
