@@ -95,3 +95,4 @@ with col2:
     st.markdown("---")
     st.markdown("**Legend:**")
     st.markdown("- 🏠 House (green)\n- 🏢 Apartment (blue)\n- 🏬 Condo (purple)")
+

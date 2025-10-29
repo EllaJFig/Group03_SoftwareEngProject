@@ -3,6 +3,7 @@ import hashlib
 import os
 
 dbName = "prototype.db"
+
 connection = sqlite3.connect(dbName)
 cursor = connection.cursor()
 
@@ -27,7 +28,9 @@ cursor.execute(command1)
 
 
 #TABLE client
-command2 = """CREATE TABLE IF NOT EXISTS client(
+
+command2 = """
+CREATE TABLE IF NOT EXISTS client(
 userID INTEGER PRIMARY KEY AUTOINCREMENT, 
 username TEXT, 
 email TEXT, 
@@ -37,9 +40,9 @@ preferences TEXT)"""
 cursor.execute(command2)
 
 
-
 #TABLE saved_listings
-command3 = """CREATE TABLE IF NOT EXISTS saved_listings(
+command3 = """
+CREATE TABLE IF NOT EXISTS saved_listings(
 userID INTEGER, 
 listingID INTEGER, 
 dataSaved TEXT)"""
