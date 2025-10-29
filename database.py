@@ -2,8 +2,8 @@ import sqlite3
 import hashlib
 import os
 
-if os.path.exists("prototype.db"):
-    os.remove("prototype.db")
+# if os.path.exists("prototype.db"):
+#     os.remove("prototype.db")
 
 dbName = "prototype.db"
 connection = sqlite3.connect(dbName)
