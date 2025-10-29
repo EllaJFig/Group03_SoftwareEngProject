@@ -2,8 +2,7 @@ import sqlite3
 import hashlib
 import os
 
-# if os.path.exists("prototype.db"):
-#     os.remove("prototype.db")
+
 
 dbName = "prototype.db"
 connection = sqlite3.connect(dbName)
@@ -38,15 +37,17 @@ preferences TEXT)"""
 
 cursor.execute(command2)
 
-pw = hashlib.sha256("password123".encode()).hexdigest()
-cursor.execute("""INSERT INTO client (
-               email,
-               password
-               )
-               VALUES (
-               ?,
-               ?
-               );""", ("test123@gmail.com", pw))
+# pw = hashlib.sha256("password123".encode()).hexdigest()
+# cursor.execute("""INSERT INTO client (
+#                username,
+#                email,
+#                password
+#                )
+#                VALUES (
+#                ?,
+#                ?,
+#                ?
+#                );""")
 
 
 #TABLE saved_listings
@@ -94,7 +95,7 @@ cursor.execute(command3)
 
 
 #cursor.execute("DELETE FROM listings WHERE title = 'test1'")
-# cursor.execute("SELECT email, password FROM client")
+# cursor.execute("SELECT username, email, password FROM client")
 # print(cursor.fetchall())
 connection.commit()
 connection.close()
