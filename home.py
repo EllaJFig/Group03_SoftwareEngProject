@@ -1,55 +1,68 @@
 import streamlit as st
 from streamlit_folium import st_folium
 import folium
+import get_db_info
 
-# config
+
+
+# config ------------------------------------------------------------------------
 st.set_page_config(
     page_title="CP317 Manje Demo",
     page_icon="🏠",
     layout="wide"  # full-width desktop layout
 )
 
-# header
+# header ------------------------------------------------------------------------
 st.markdown(
     """
-    <h1 style='text-align: center; color: #2C3E50;'>🏠 Manje Rentals</h1>
-    <h3 style='text-align: center; color: #5D6D7E;'>Trouble finding University housing? Look no further!</h3>
+    <h1 style='text-align: center; color: #2C3E50;'>🏠 MANJE RENTALS</h1>
+    <h3 style='text-align: center; color: #5D6D7E;'>
+        <i>Trouble finding University housing? Look no further!<i> </h3>
     <hr style='margin-top: 10px; margin-bottom: 30px;'>
     """,
     unsafe_allow_html=True
 )
 
+if 'current_listing' not in st.session_state:
+    st.session_state['current_listing'] = None
+
+if st.session_state['current_listing'] is None:
+    st.session_state['current_listing'] = get_db_info.Listing().get_data()
+
+icon_map = {"House": {"icon": "home", "colour": "green"}, "Apartment": {"icon": "building", "colour": "blue"}, "Condo": {"icon": "university", "colour": "purple"} }
 # main
 col1, col2 = st.columns([1, 1])
 
 with col1:
+    
+    currentLocation = [43.4643, -80.5204]
     # map preview
     st.markdown("###  Interactive Map Preview")
-
     # Create the map 
-    m = folium.Map(location=[43.4643, -80.5204], zoom_start=13)
+    m = folium.Map(location= currentLocation, zoom_start=13)
 
-  
-    folium.Marker(
-        [43.4735, -80.5434],
-        popup="<b>Kijiji Listing #1</b><br>$1,800/month<br>2 Bed • 1 Bath<br>Close to WLU",
-        tooltip="Kijiji Listing #1"
-    ).add_to(m)
 
-    folium.Marker(
-        [43.4641, -80.5242],
-        popup="<b>Realtor.ca Listing #2</b><br>$2,200/month<br>1 Bed • 1 Bath<br>Downtown Waterloo",
-        tooltip="Realtor.ca Listing #2"
-    ).add_to(m)
+    listing_data = st.session_state['current_listing']
 
-    folium.Marker(
-        [43.4602, -80.5151],
-        popup="<b>Kijiji Listing #3</b><br>$2,000/month<br>2 Bed • 2 Bath<br>Near University Ave",
-        tooltip="Kijiji Listing #3"
-    ).add_to(m)
+    if listing_data:
+
+        for listing in listing_data:
+
+            icon_info = icon_map.get(listing.get('type'))
+
+            folium.Marker(
+                [listing['lat'], listing['lon']],
+                icon=folium.Icon(color=icon_info['colour'], icon=icon_info['icon'], prefix='fa'),
+                popup=listing['popup'],
+                tooltip=listing['name']
+            ).add_to(m)
+
+        
+    else:
+        st.write("no listings to load")
 
     # Display mao
-    st_folium(m, width=700, height=400)
+    st_folium(m, width=700, height=650)
 
 with col2:
     st.markdown(
@@ -70,8 +83,6 @@ with col2:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-st.markdown("---")
-
 # Footer
 colA, colB, colC = st.columns(3)
 
@@ -80,10 +91,5 @@ with colA:
         st.write("Navigating to Map Page...")
 
 with colB:
-    if st.button("💾 Saved Listings"):
-        st.write("Navigating to Saved Listings...")
-
-with colC:
     if st.button("👤 Profile"):
         st.write("Navigating to Profile Page...")
-
