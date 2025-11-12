@@ -1,8 +1,10 @@
+
 import {createObjectCsvWriter} from 'csv-writer';
 import puppeteer from "puppeteer";
 import fs from 'fs';
 
 export class AbsScraper {
+
     constructor(config, selectors) {
         if (new.target === AbsScraper)
             throw new Error ("cant be instantiated direcly");
