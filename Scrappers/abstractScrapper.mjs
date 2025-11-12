@@ -1,7 +1,5 @@
 
 import {createObjectCsvWriter} from 'csv-writer';
-import puppeteer from "puppeteer";
-import fs from 'fs';
 
 export class AbsScraper {
 
