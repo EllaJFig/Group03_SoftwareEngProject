@@ -1,2 +1,3 @@
-2025/11/04-17:27:45.731 8d66c Creating DB /Users/ejfig/Desktop/CP317/Group03_SoftwareEngProject/user_data/Default/Extension Rules since it was missing.
-2025/11/04-17:27:45.741 8d66c Reusing MANIFEST /Users/ejfig/Desktop/CP317/Group03_SoftwareEngProject/user_data/Default/Extension Rules/MANIFEST-000001
+2025/11/11-22:27:27.376 7818d Reusing MANIFEST /Users/aasthapunj/Desktop/user_database/Group03_SoftwareEngProject/user_data/Default/Extension Rules/MANIFEST-000001
+2025/11/11-22:27:27.376 7818d Recovering log #3
+2025/11/11-22:27:27.376 7818d Reusing old log /Users/aasthapunj/Desktop/user_database/Group03_SoftwareEngProject/user_data/Default/Extension Rules/000003.log 

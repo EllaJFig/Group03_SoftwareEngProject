@@ -56,16 +56,18 @@ async function scrapePages(browser) {
                     const bedrooms = card.querySelector('[aria-label="Bedrooms"] p')?.innerText || "n/a";
                     const bathrooms = card.querySelector('[aria-label="Bathrooms"] p')?.innerText || "n/a";
                     const location = card.querySelector('[data-testid="listing-location"]')?.innerText || "n/a";
+                    const address = card.querySelector('[data-testid="listing-address"]')?.innerText || "n/a";
                     
 
                     data.push({
                         'Title': title,
-                        'Price' : price,
+                        'Price' : parseFloat(price.replace(/[^0-9.]/g, ''))||0,
                         'Bedrooms': bedrooms,
                         'Bathrooms': bathrooms,
                         'Location': location,
                         'Description': desc,
-                        'URL': link
+                        'URL': link,
+                        'Address': address
                     });
                     
                 });

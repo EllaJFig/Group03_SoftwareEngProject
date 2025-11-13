@@ -20,7 +20,7 @@
   "homepage": "https://github.com/EllaJFig/Group03_SoftwareEngProject#readme",
   "dependencies": {
     "json2csv": "^6.0.0-alpha.2",
-    "puppeteer": "^24.28.0",
+    "puppeteer": "^24.29.1",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
