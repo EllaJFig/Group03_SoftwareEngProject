@@ -16,6 +16,7 @@ const SELECTORS_RENTALSCA = { //specific HTML call information for rentals.ca
     LINK: 'listing-card__details-link',
 };
 
+//NOT SET UP YET
 export class RentalscaScraper extends AbsScraper {
 
     //call abstract class to get url outline and save configuration variables + create dataList to store all listing info
@@ -41,7 +42,4 @@ export class RentalscaScraper extends AbsScraper {
             
         })
     }
-
-    //main execution method to go through each page
-
 }

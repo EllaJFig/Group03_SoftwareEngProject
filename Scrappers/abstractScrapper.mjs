@@ -1,4 +1,4 @@
-
+import puppeteer from 'puppeteer-extra';
 import {createObjectCsvWriter} from 'csv-writer';
 
 export class AbsScraper {
@@ -12,24 +12,45 @@ export class AbsScraper {
         this.page = null;
     }
 
-    //going to url func --> takes url
-    async buildUrl(pageNumber) {
+    //override funcs
+    buildURL(pageNumber) {
        throw new Error("implement a buildURL method");
     }
 
-    //scrolling page func 
     async scrollPage(){
         throw new Error("implement scrollPage method ");
     }
 
-    //saving to csv func --> takes data and output file name
+    async scrapePage() {
+        throw new Error("no child class has been implemented for scrapePage()");
+    }
+
+    async scrapeAddress(url) {
+        return null;
+    }
+
+    //generic methods
+    async getText(element,selector) {
+        const found = await element.$(selector);
+        if (!found) return null;
+        return await element.$eval(selector,el => el.innerText.trim());
+    }
+
+    async getAttribute(element,selector, attribute) {
+        const found = await element.$(selector);
+        if (!found) return null;
+        return await element.$eval(selector, (el,attribute) => el.getAttribute(attribute), attribute);
+    }
+
+
+    //save results to csv
     async saveCSV(data, filename = 'scraped_data.csv') {
         if (data.length === 0){
             console.log("no data written to csv");
             return;
         } 
 
-        const header =Object.keys(data[0]).map(key => ({
+        const header = Object.keys(data[0]).map(key => ({
             id: key,
             title: key.replace(/_/g, ' ').toUpperCase()
         }));
@@ -44,40 +65,53 @@ export class AbsScraper {
         console.log('done writting');
 
     }
+    //closing browser
+    async closeBrowser() {
+        if (this.browser) {
+            await this.browser.close();
+            console.log("closed broswser");
+        }
+    }
 
     //execute function that will run either file
     async execute() {
         let allData =[];
 
         try {
-            const puppeteer = await import('puppeteer');
+            
             this.browser = await puppeteer.launch({headless: true});
             this.page = await this.browser.newPage();
 
             for (let i = 1; i<= this.config.PAGES_TO_SCRAPE; i++) {
-                const url = this.buildUrl(i);
+                const url = this.buildURL(i);
                 console.log('Navigating to page');
-                await this.page.goto(url, {waitUntil: 'networkkidle2', timeout: 60000});
+                await this.page.goto(url, {waitUntil: 'networkidle2', timeout: 60000});
 
-                const pageData = await this.scrollPage();
-                if (pageData.length === 0) {
-                    console.log('no new listings...stopped');
-                    break;
+                await this.scrollPage();
+
+                const pageData = await this.scrapePage();
+
+                if (!pageData || pageData.length === 0) {
+                    console.log(`Page ${i} had no listings continue...`);
+                    continue;
                 }
 
-                allData = allData.concat(pageData);
+                if (this.scrapeAddress !== AbsScraper.prototype.scrapeAddress) {
+                    for (let listing of pageData) {
+                        listing.address = await this.scrapeAddress(listing.url);
+                    }
+                }
+                
+                allData.push(...pageData);
                 console.log(`scrapped ${pageData.length} listings`)
             }
 
+            await this.saveCSV(allData);
             return allData;
+
         } catch(error) {
             console.error("error happened during execution", error);
             return [];
-        } finally {
-            if (this.browser) {
-                await this.browser.close();
-                console.log("closed browser");
-            }
-        }
+        } 
     }
 }

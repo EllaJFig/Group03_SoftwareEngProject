@@ -8,13 +8,18 @@ from firebase_admin import firestore
 '''
 end goal --> call this function to upload a single listings attributes to a table where the feilds are the following;
 FIELDS;
-    bathrooms
-    bedrooms
-    desc
-    location
-    price
-    title
-    url
+    title,
+    price,
+    location,
+    url,
+    bedrooms,
+    bathrooms,
+    square_feet: sqfeet,
+    type,
+    parking_info,
+    pet_friendly,
+    address,
+    source,
 
 '''
 
@@ -58,8 +63,8 @@ def checkData(db, collection, address, price):
 
 #filepath to key
 
-fp = r"/Users/aasthapunj/Downloads/group03softengproj-firebase-adminsdk-fbsvc-2c7834f25a.json"
-filename = "kijiji_data.csv" #maybe we change this to work with both files
+fp = r"" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DIVICE
+filename = "scraped_data.csv" #this will be both scrappers saved into one file
 
 
 saveToFB(filename, fp)
