@@ -146,7 +146,7 @@ export class KijijiScraper extends AbsScraper {
 
                 listings.push({
                     title,
-                    price,
+                    price: parseFloat(price.replace(/[^0-9.]/g, ''))||0,
                     location,
                     url,
                     bedrooms,
