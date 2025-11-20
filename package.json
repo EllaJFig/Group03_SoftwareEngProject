@@ -1,27 +1,7 @@
 {
-  "name": "group03_softwareengproject",
-  "version": "1.0.0",
-  "description": "Software Project to visualize rental data",
-  "main": "KijijiScrapping.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/EllaJFig/Group03_SoftwareEngProject.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/EllaJFig/Group03_SoftwareEngProject/issues"
-  },
-  "homepage": "https://github.com/EllaJFig/Group03_SoftwareEngProject#readme",
   "dependencies": {
-    "json2csv": "^6.0.0-alpha.2",
+    "csv-writer": "^1.6.0",
     "puppeteer": "^24.29.1",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra": "^3.3.6"
   }
 }

@@ -3,28 +3,43 @@ import csv
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+from geopy.geocoders import Nominatim
 
 
 '''
 end goal --> call this function to upload a single listings attributes to a table where the feilds are the following;
 FIELDS;
-    bathrooms
-    bedrooms
-    desc
-    location
-    price
-    title
-    url
+    title,
+    price,
+    location,
+    url,
+    bedrooms,
+    bathrooms,
+    square_feet: sqfeet,
+    type,
+    parking_info,
+    pet_friendly,
+    address,
+    source,
 
 '''
-
+geocoder_object = Nominatim(user_agent="long_lat")
+def getCoords(address):
+    loc = geocoder_object.geocode(address)
+    if loc:
+        return loc.longitude, loc.latitude
+    else:
+        return None, None
+    
+def Kijiji_setdata():
+    pass
 
 def saveToFB(filename, fp):
-        
     with open(filename, 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         data_importing = [row for row in reader ]
 
+    #connect to firebase
     if not firebase_admin._apps:
         cred = credentials.Certificate(fp)
         firebase_admin.initialize_app(cred)
@@ -34,6 +49,9 @@ def saveToFB(filename, fp):
     coll_ref = db.collection('listings')
 
     for i in data_importing:
+        print(i.get("Bedrooms"))
+        #call kijiji_setdata
+        # Kijiji_setdata(i.get('price'))
         price = i.get("Price", "").strip()
         address = i.get("Address", "").strip().lower()
         # print(f"\nChecking listing: Address='{address}', Price='{price}'")
@@ -58,8 +76,8 @@ def checkData(db, collection, address, price):
 
 #filepath to key
 
-fp = r"/Users/aasthapunj/Downloads/group03softengproj-firebase-adminsdk-fbsvc-2c7834f25a.json"
-filename = "kijiji_data.csv" #maybe we change this to work with both files
+fp = r"/Users/aasthapunj/Downloads/group03softengproj-firebase-adminsdk-fbsvc-2c7834f25a.json" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DEVICE
+filename = "scraped_data.csv" #this will be both scrappers saved into one file
 
 
 saveToFB(filename, fp)
