@@ -49,11 +49,32 @@ def saveToFB(filename, fp):
     coll_ref = db.collection('listings')
 
     for i in data_importing:
-        print(i.get("Bedrooms"))
         #call kijiji_setdata
         # Kijiji_setdata(i.get('price'))
-        price = i.get("Price", "").strip()
+        price = float((i.get("Price")).replace("$", "").replace(",", ""))
         address = i.get("Address", "").strip().lower()
+        bedrooms = i.get("Bedrooms").replace("Bedrooms", "")
+        bathrooms = i.get("Bathrooms").replace("Bathrooms","")
+        sqft = i.get("Sqft").replace("sqft","").replace(",", "")
+        parking = int(i.get("Parking").replace("Parking","").replace("Included","").replace("+","").strip())
+        parking_available = "N"
+        if (parking >= 1):
+            parking_available = "Y"
+        
+        i["Price"] = price
+        i["Address"] = address
+        i["Bedrooms"] = bedrooms
+        i["Bathrooms"] = bathrooms
+        i["Sqft"] = sqft
+        i["Parking"] = parking_available
+
+        # print(i.get("Price"))
+        # print(i.get("Address"))
+        # print(i.get("Bedrooms"))
+        # print(i.get("Bathroooms"))
+        # print(i.get("Sqft"))
+        # print(i.get("Parking"))
+
         # print(f"\nChecking listing: Address='{address}', Price='{price}'")
 
         if not checkData(db, 'listings', address, price):
@@ -77,7 +98,7 @@ def checkData(db, collection, address, price):
 #filepath to key
 
 fp = r"/Users/aasthapunj/Downloads/group03softengproj-firebase-adminsdk-fbsvc-2c7834f25a.json" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DEVICE
-filename = "scraped_data.csv" #this will be both scrappers saved into one file
+filename = "KijijiScrappedData.csv" #this will be both scrappers saved into one file
 
 
 saveToFB(filename, fp)
