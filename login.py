@@ -1,5 +1,5 @@
 import sqlite3
-import database
+import setData
 import hashlib
 class Client:
 
@@ -13,7 +13,7 @@ class Client:
     def find_email_db(self):
 
         try:
-            connection = sqlite3.connect(database.dbName)
+            connection = sqlite3.connect(setData.dbName)
             cursor = connection.cursor()
             cursor.execute("SELECT password FROM client WHERE email =?;", (self.email,))
             exists = cursor.fetchone()

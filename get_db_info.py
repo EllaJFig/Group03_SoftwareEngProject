@@ -1,4 +1,4 @@
-import database
+import setData
 import sqlite3
 
 class Listing:
@@ -6,7 +6,7 @@ class Listing:
     #get data
     def get_data(self):
 
-        connection = sqlite3.connect(database.dbName) #database; fix later to make global name
+        connection = sqlite3.connect(setData.dbName) #database; fix later to make global name
         connection.row_factory = sqlite3.Row #get row
         cursor = connection.cursor() 
 
