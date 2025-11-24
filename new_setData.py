@@ -64,7 +64,7 @@ def checkData(db, collection, address, price):
 #filepath to key
 
 fp = r"" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DIVICE
-filename = "scraped_data.csv" #this will be both scrappers saved into one file
+filename = "KijijiScrapperData.csv" 
 
 
 saveToFB(filename, fp)
