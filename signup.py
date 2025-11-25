@@ -1,12 +1,12 @@
 import sqlite3
-import database
+import setData
 import hashlib
 from login import Client
 
 def find_email_db(email):
 
         try:
-            connection = sqlite3.connect(database.dbName)
+            connection = sqlite3.connect(setData.dbName)
             cursor = connection.cursor()
             cursor.execute("SELECT COUNT(*) FROM client WHERE email =?;", (email,))
             exists = cursor.fetchone()[0]>0
@@ -47,7 +47,7 @@ class NewClient:
             return False
         
         try:
-            connection = sqlite3.connect(database.dbName)
+            connection = sqlite3.connect(setData.dbName)
             cursor = connection.cursor()
             username = f"{self.first_name} {self.last_name}"
             password = Client(self.email, self.password).user_password(self.password)
