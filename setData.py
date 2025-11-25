@@ -7,27 +7,19 @@ from geopy.geocoders import Nominatim
 import datetime
 
 '''
-end goal --> call this function to upload a single listings attributes to a table where the feilds are the following;
 FIELDS;
-    price,
-    location,
-    url,
-    bedrooms,
-    bathrooms,
-    sqft,
-    type,
-    parking_info,
-    source,
-
+    Price,
+    Location,
+    URL,
+    Bedrooms,
+    Bathrooms,
+    Sqft,
+    Type,
+    Parking,
+    Source,
+    Upload Date
 '''
-geocoder_object = Nominatim(user_agent="long_lat")
-def getCoords(address):
-    loc = geocoder_object.geocode(address)
-    if loc:
-        return loc.longitude, loc.latitude
-    else:
-        return None, None
-    
+
 
 '''Opens csv file Kfilename ("KijijiScrapperData.csv")
     Open path to firebase
@@ -71,7 +63,6 @@ def Kijiji_setdata(filename, fp):
         i["Parking"] = parking_available
         i["Type"] = type
         i["Source"] = "Kijiji"
-        i["savedBy"] = []
         i["Upload Date"] = datetime.date.today()
 
         # print(i.get("Price"))
@@ -91,6 +82,12 @@ def Kijiji_setdata(filename, fp):
 
     os.remove(filename)
 
+
+'''Opens csv file Rfilename ("RentalscaScrapperData.csv")
+    Open path to firebase
+    Loop listing information from csv file, strip and set info
+    Delete csv file when done
+'''
 def Rentalsca_setdata(filename,fp):
     with open(filename, 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
@@ -159,7 +156,6 @@ def Rentalsca_setdata(filename,fp):
         i["Parking"] = parking
         i["Type"] = type
         i["Source"] = "Rentals.ca"
-        i["savedBy"] = []
         i["Upload Date"] = datetime.date.today()
 
         '''remove Features feild'''
@@ -174,7 +170,7 @@ def Rentalsca_setdata(filename,fp):
     os.remove(filename)
 
 
-        
+'''check for duplicate listings in the database using addess and price as the comparisons'''
 def checkData(db, collection, address, price):
     coll_ref = db.collection(collection)
     # q = coll_ref.where("address", "==", new_listing.get("address")) \
@@ -187,8 +183,7 @@ def checkData(db, collection, address, price):
     return len(duplicate)>0
 
 #filepath to key
-
-fp = r"" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DIVICE
+fp = r"" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DEVICE
 Kfilename = "KijijiScrapperData.csv" 
 Rfilename = "RentalscaScrapperData.csv"
 
