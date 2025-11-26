@@ -3,7 +3,6 @@ import os
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
-from geopy.geocoders import Nominatim
 import datetime
 
 '''
@@ -46,8 +45,9 @@ def Kijiji_setdata(filename, fp):
         # Kijiji_setdata(i.get('price'))
         price = (i.get("Price")).replace("$", "").replace(",", "") #DONT PUT FLOAT; some listings have price as "Please Contact"
         location = i.get("Location", "").strip().lower()
-        bedrooms = i.get("Bedrooms").replace("Bedrooms", "")
-        bathrooms = i.get("Bathrooms").replace("Bathrooms","")
+        bedrooms = (i.get("Bedrooms").replace("Bedrooms", "")).replace("+", "")
+
+        bathrooms = (i.get("Bathrooms").replace("Bathrooms","")).replace("+","")
         type = i.get("Type").strip().lower()
         sqft = i.get("sqft").replace("sqft","").replace(",", "")
         parking = int(i.get("Parking").replace("Parking","").replace("Included","").replace("+","").strip())
@@ -63,11 +63,11 @@ def Kijiji_setdata(filename, fp):
         i["Parking"] = parking_available
         i["Type"] = type
         i["Source"] = "Kijiji"
-        i["Upload Date"] = datetime.date.today()
+        i["Upload Date"] = str(datetime.date.today())
 
         # print(i.get("Price"))
         # print(i.get("Address"))
-        # print(i.get("Bedrooms"))
+        #print(i.get("Bedrooms"))
         # print(i.get("Bathroooms"))
         # print(i.get("Sqft"))
         # print(i.get("Parking"))
@@ -81,6 +81,9 @@ def Kijiji_setdata(filename, fp):
         #     print("duplicate detected\n")
 
     os.remove(filename)
+        
+
+    
 
 
 '''Opens csv file Rfilename ("RentalscaScrapperData.csv")
@@ -156,7 +159,7 @@ def Rentalsca_setdata(filename,fp):
         i["Parking"] = parking
         i["Type"] = type
         i["Source"] = "Rentals.ca"
-        i["Upload Date"] = datetime.date.today()
+        i["Upload Date"] = str(datetime.date.today())
 
         '''remove Features feild'''
         i.pop("Features", None)
@@ -183,12 +186,12 @@ def checkData(db, collection, address, price):
     return len(duplicate)>0
 
 #filepath to key
-fp = r"" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DEVICE
+fp = r"/Users/ejfig/Downloads/group03softengproj-firebase-adminsdk-fbsvc-ce4ce6ce21.json" #INSERT YOUR FILE PATH TO THE FIREBASE DATABASE FROM YOUR DEVICE
 Kfilename = "KijijiScrapperData.csv" 
 Rfilename = "RentalscaScrapperData.csv"
 
 '''RUN WHEN RENTALS DATA'''
-#Rentalsca_setdata(Rfilename, fp)
+Rentalsca_setdata(Rfilename, fp)
 
 '''RUN WHEN KIJIJI DATA'''
 #Kijiji_setdata(Kfilename,fp)
