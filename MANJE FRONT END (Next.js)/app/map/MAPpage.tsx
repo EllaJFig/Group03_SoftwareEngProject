@@ -1,243 +1,297 @@
 "use client";
 
-import { useState } from "react";
 import dynamic from "next/dynamic";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useState } from "react";
+import { getAllListings } from "@/utils/firestore";
+import { smartLocalGeocode, extractPostal } from "@/utils/localGeocode";
+import { getSavedListings, saveListing, removeListing } from "@/utils/saved";
 
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Popup = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Popup),
-  { ssr: false }
-);
+const ListingMap = dynamic(() => import("@/components/Map"), { ssr: false });
 
-interface Listing {
-  id: number;
-  title: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  area: number;
-  type: string;
-  latitude: number;
-  longitude: number;
-  address: string;
-  yearBuilt: number;
-  amenities: string[];
-  parking: string;
-  petsAllowed: boolean;
-  sourcePlatform: string;
-  sourceUrl: string;
-  imageUrl: string;
+// Browser scraper using corsproxy.io
+async function fetchPreviewBrowser(url: string) {
+  try {
+    const proxy = "https://corsproxy.io/?";
+    const fullURL = proxy + encodeURIComponent(url);
+
+    const html = await fetch(fullURL).then((res) => res.text());
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const og = doc.querySelector('meta[property="og:image"]')?.content;
+    const tw = doc.querySelector('meta[name="twitter:image"]')?.content;
+
+    return og || tw || null;
+  } catch {
+    return null;
+  }
 }
 
-export default function MapView() {
-  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+function dedupeListings(list) {
+  const seen = new Map();
+  for (const l of list) {
+    const key =
+      (l.URL || "").trim().toLowerCase() ||
+      (l.Location || "").trim().toLowerCase() ||
+      l.id;
 
-  const listings: Listing[] = [
-    {
-      id: 1,
-      title: "Luxury Condo Downtown",
-      price: 2200,
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 900,
-      type: "Condo",
-      latitude: 43.4641,
-      longitude: -80.5242,
-      address: "456 Road, Waterloo",
-      yearBuilt: 2018,
-      amenities: ["Pool", "Gym", "Balcony"],
-      parking: "Underground",
-      petsAllowed: true,
-      sourcePlatform: "Realtor.ca",
-      sourceUrl: "#",
-      imageUrl: "/dummy-condo.jpg",
-    },
-    {
-      id: 2,
-      title: "Cozy Apartment",
-      price: 1800,
-      bedrooms: 1,
-      bathrooms: 1,
-      area: 700,
-      type: "Apartment",
-      latitude: 43.4735,
-      longitude: -80.5434,
-      address: "123 Street, Kitchener",
-      yearBuilt: 2015,
-      amenities: ["Gym", "Balcony"],
-      parking: "Street",
-      petsAllowed: false,
-      sourcePlatform: "Kijiji",
-      sourceUrl: "#",
-      imageUrl: "/dummy-apartment.jpg",
-    },
-    {
-      id: 3,
-      title: "Family House",
-      price: 2500,
-      bedrooms: 3,
-      bathrooms: 2,
-      area: 1200,
-      type: "House",
-      latitude: 43.4602,
-      longitude: -80.5151,
-      address: "789 Ave, Cambridge",
-      yearBuilt: 2005,
-      amenities: ["Garage", "Garden", "Fireplace"],
-      parking: "Driveway",
-      petsAllowed: true,
-      sourcePlatform: "Kijiji",
-      sourceUrl: "#",
-      imageUrl: "/dummy-house.jpg",
-    },
-  ];
+    if (!seen.has(key)) seen.set(key, l);
+  }
+  return Array.from(seen.values());
+}
 
-  const iconColors: Record<string, string> = {
-    House: "green",
-    Apartment: "blue",
-    Condo: "purple",
-  };
+function getImg(l) {
+  return (
+    l?.preview ||
+    (Array.isArray(l?.Images) ? l.Images[0] : null) ||
+    l?.image ||
+    null
+  );
+}
+
+export default function MapPage() {
+  const [listings, setListings] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [selected, setSelected] = useState(null);
+
+  const [savedIds, setSavedIds] = useState(() =>
+    getSavedListings().map((l) => l.id)
+  );
+
+  const [priceFilter, setPriceFilter] = useState("Any");
+  const [bedFilter, setBedFilter] = useState("Any");
+  const [bathFilter, setBathFilter] = useState("Any");
+  const [typeFilter, setTypeFilter] = useState("Any");
+
+  function toggleSave(listing) {
+    if (savedIds.includes(listing.id)) {
+      removeListing(listing.id);
+      setSavedIds(savedIds.filter((x) => x !== listing.id));
+      return;
+    }
+
+    const payload = {
+      id: listing.id,
+      title: listing.Title,
+      price: Number(listing.Price),
+      bedrooms: Number(listing.Bedrooms),
+      bathrooms: Number(listing.Bathrooms),
+      sqft: listing.Sqft || null,
+      address: listing.Location,
+      url: listing.URL,
+      preview: getImg(listing),
+      savedAt: Date.now(),
+    };
+
+    saveListing(payload);
+    setSavedIds([...savedIds, listing.id]);
+  }
+
+  useEffect(() => {
+    async function load() {
+      let raw = await getAllListings();
+      raw = dedupeListings(raw);
+
+      const processed = await Promise.all(
+        raw.map(async (item) => {
+          const postal = extractPostal(item.Location);
+          const [lat, lon] = smartLocalGeocode(postal, item.City);
+
+          const preview = await fetchPreviewBrowser(item.URL);
+
+          return {
+            ...item,
+            latitude: lat,
+            longitude: lon,
+            preview,
+          };
+        })
+      );
+
+      setListings(processed);
+      setFiltered(processed);
+    }
+
+    load();
+  }, []);
+
+  function applyFilters() {
+    let data = [...listings];
+
+    if (priceFilter !== "Any") {
+      if (priceFilter === "$0 - $1000") data = data.filter((l) => Number(l.Price) <= 1000);
+      if (priceFilter === "$1000 - $1500") data = data.filter((l) => Number(l.Price) >= 1000 && Number(l.Price) <= 1500);
+      if (priceFilter === "$1500 - $2000") data = data.filter((l) => Number(l.Price) >= 1500 && Number(l.Price) <= 2000);
+      if (priceFilter === "$2000+") data = data.filter((l) => Number(l.Price) >= 2000);
+    }
+
+    if (bedFilter !== "Any") {
+      data = data.filter((l) =>
+        bedFilter === "3+" ? Number(l.Bedrooms) >= 3 : l.Bedrooms === bedFilter
+      );
+    }
+
+    if (bathFilter !== "Any") {
+      data = data.filter((l) =>
+        bathFilter === "3+" ? Number(l.Bathrooms) >= 3 : l.Bathrooms === bathFilter
+      );
+    }
+
+    if (typeFilter !== "Any") {
+      data = data.filter((l) =>
+        (l.Type || "").toLowerCase().includes(typeFilter.toLowerCase())
+      );
+    }
+
+    setFiltered(data);
+  }
 
   return (
-    <main className="flex min-h-screen bg-gray-900 text-white p-6 gap-6">
-      {/* LEFT PANEL — FILTERS */}
-      <aside className="w-80 bg-gray-800 p-6 rounded-2xl overflow-y-auto">
+    <main className="flex min-h-screen bg-black text-white pt-24">
+      
+      {/* LEFT FILTERS */}
+      <aside className="w-80 bg-gray-900 p-6 rounded-xl mr-4 h-fit space-y-6">
         <h2 className="text-xl font-bold uppercase mb-4">Filters</h2>
-        <div className="space-y-4">
-          <label className="block uppercase font-semibold">Price Range</label>
-          <select className="w-full p-2 rounded bg-gray-700 text-white">
-            <option>Any</option>
-            <option>$0 - $1000</option>
-            <option>$1000 - $1500</option>
-            <option>$1500 - $2000</option>
-            <option>$2000+</option>
-          </select>
 
-          <label className="block uppercase font-semibold">Bedrooms</label>
-          <select className="w-full p-2 rounded bg-gray-700 text-white">
-            <option>Any</option>
-            <option>1</option>
-            <option>2</option>
-            <option>3</option>
-            <option>4+</option>
-          </select>
+        <select value={priceFilter} onChange={(e) => setPriceFilter(e.target.value)}
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700">
+          <option>Any</option>
+          <option>$0 - $1000</option>
+          <option>$1000 - $1500</option>
+          <option>$1500 - $2000</option>
+          <option>$2000+</option>
+        </select>
 
-          <label className="block uppercase font-semibold">Bathrooms</label>
-          <select className="w-full p-2 rounded bg-gray-700 text-white">
-            <option>Any</option>
-            <option>1</option>
-            <option>2</option>
-            <option>3+</option>
-          </select>
+        <select value={bedFilter} onChange={(e) => setBedFilter(e.target.value)}
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700">
+          <option>Any</option>
+          <option>1</option>
+          <option>2</option>
+          <option>3+</option>
+        </select>
 
-          <label className="block uppercase font-semibold">Area (sq ft)</label>
-          <select className="w-full p-2 rounded bg-gray-700 text-white">
-            <option>Any</option>
-            <option>500+</option>
-            <option>700+</option>
-            <option>1000+</option>
-          </select>
+        <select value={bathFilter} onChange={(e) => setBathFilter(e.target.value)}
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700">
+          <option>Any</option>
+          <option>1</option>
+          <option>2</option>
+          <option>3+</option>
+        </select>
 
-          <label className="block uppercase font-semibold">Property Type</label>
-          <select className="w-full p-2 rounded bg-gray-700 text-white">
-            <option>Any</option>
-            <option>House</option>
-            <option>Apartment</option>
-            <option>Condo</option>
-          </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          className="w-full p-2 rounded bg-gray-800 border border-gray-700">
+          <option>Any</option>
+          <option>House</option>
+          <option>Apartment</option>
+          <option>Condo</option>
+        </select>
 
-          <button className="w-full mt-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-bold uppercase">
-            Apply Filters
-          </button>
-        </div>
+        <button
+          onClick={applyFilters}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl"
+        >
+          Apply Filters
+        </button>
       </aside>
 
-      {/* MIDDLE PANEL — MAP */}
-      <section className="flex-1 rounded-2xl overflow-hidden border border-gray-700 shadow-2xl">
-        <MapContainer
-          center={[43.4723, -80.5449]}
-          zoom={13}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          />
-          {listings.map((listing) => (
-            <Marker
-              key={listing.id}
-              position={[listing.latitude, listing.longitude]}
-              icon={L.icon({
-                iconUrl:
-                  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                shadowUrl:
-                  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-                shadowSize: [41, 41],
-              })}
-              eventHandlers={{
-                click: () => setSelectedListing(listing),
-              }}
-            >
-              <Popup>
-                <b>{listing.title}</b>
-                <br />
-                ${listing.price}/month
-                <br />
-                {listing.bedrooms} Bed • {listing.bathrooms} Bath
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+      {/* MAP */}
+      <section className="flex-1 border border-gray-800 rounded-xl overflow-hidden">
+        <ListingMap listings={filtered} onSelectListing={setSelected} />
       </section>
 
-      {/* RIGHT PANEL — DETAILS */}
-      <aside className="w-80 bg-gray-800 p-6 rounded-2xl overflow-y-auto">
-        {selectedListing ? (
-          <div className="space-y-3">
-            <h2 className="text-xl font-bold uppercase">{selectedListing.title}</h2>
-            <img
-              src={selectedListing.imageUrl}
-              alt={selectedListing.title}
-              className="w-full rounded-lg border border-gray-700"
-            />
-            <p className="mb-1"><strong>Price:</strong> ${selectedListing.price}/month</p>
-            <p className="mb-1"><strong>Bedrooms:</strong> {selectedListing.bedrooms}</p>
-            <p className="mb-1"><strong>Bathrooms:</strong> {selectedListing.bathrooms}</p>
-            <p className="mb-1"><strong>Area:</strong> {selectedListing.area} sq ft</p>
-            <p className="mb-1"><strong>Address:</strong> {selectedListing.address}</p>
-            <p className="mb-1"><strong>Year Built:</strong> {selectedListing.yearBuilt}</p>
-            <p className="mb-1"><strong>Amenities:</strong> {selectedListing.amenities.join(", ")}</p>
-            <p className="mb-1"><strong>Parking:</strong> {selectedListing.parking}</p>
-            <p className="mb-1"><strong>Pets Allowed:</strong> {selectedListing.petsAllowed ? "Yes" : "No"}</p>
-            <p className="italic">{selectedListing.sourcePlatform}</p>
-            <a
-              href={selectedListing.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-400 hover:underline"
-            >
-              View Original Listing
-            </a>
-          </div>
+      {/* RIGHT PANEL */}
+      <aside className="w-80 bg-gray-900 p-6 rounded-xl ml-4 overflow-y-auto max-h-[85vh]">
+        {!selected ? (
+          <p className="text-gray-400">Click a marker to view details.</p>
+        ) : selected.multi ? (
+          <>
+            <h2 className="text-xl font-bold mb-4">
+              {selected.listings.length} listings here:
+            </h2>
+
+            <div className="space-y-4">
+              {selected.listings.map((l) => {
+                const img = getImg(l);
+                const isSaved = savedIds.includes(l.id);
+
+                return (
+                  <div key={l.id} className="bg-gray-800 p-3 rounded-lg">
+                    {img && (
+                      <img
+                        src={img}
+                        className="w-full h-32 object-cover rounded-lg mb-2"
+                      />
+                    )}
+
+                    <h3 className="font-bold text-sm">{l.Title}</h3>
+                    <p className="text-sm">
+                      ${l.Price} • {l.Bedrooms} bd • {l.Bathrooms} ba
+                    </p>
+
+                    <button
+                      onClick={() => toggleSave(l)}
+                      className={`mt-2 px-3 py-1 rounded-lg text-sm ${
+                        isSaved ? "bg-red-600" : "bg-blue-600 hover:bg-blue-700"
+                      }`}
+                    >
+                      {isSaved ? "Unsave" : "Save"}
+                    </button>
+
+                    <a
+                      href={l.URL}
+                      target="_blank"
+                      className="block text-xs text-blue-400 underline mt-2"
+                    >
+                      View Listing
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
-          <p className="text-gray-400 uppercase">Select a listing on the map to see details here.</p>
+          (() => {
+            const l = selected;
+            const img = getImg(l);
+            const isSaved = savedIds.includes(l.id);
+
+            return (
+              <>
+                {img && (
+                  <img
+                    src={img}
+                    className="w-full h-48 object-cover rounded-lg mb-4"
+                  />
+                )}
+
+                <h2 className="text-2xl font-bold">{l.Title}</h2>
+                <p><strong>Price:</strong> ${l.Price}</p>
+                <p><strong>Beds:</strong> {l.Bedrooms}</p>
+                <p><strong>Baths:</strong> {l.Bathrooms}</p>
+                <p><strong>Sqft:</strong> {l.Sqft}</p>
+                <p><strong>Location:</strong> {l.Location}</p>
+
+                <button
+                  onClick={() => toggleSave(l)}
+                  className={`w-full py-2 rounded-lg ${
+                    isSaved ? "bg-red-600" : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {isSaved ? "Unsave Listing" : "Save Listing"}
+                </button>
+
+                <a
+                  href={l.URL}
+                  target="_blank"
+                  className="block text-center mt-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
+                >
+                  View Original Listing
+                </a>
+              </>
+            );
+          })()
         )}
       </aside>
     </main>
   );
 }
+
