@@ -1,26 +1,32 @@
+const STORAGE_KEY = "manje_saved_listings";
+
 export function getSavedListings() {
   if (typeof window === "undefined") return [];
-  return JSON.parse(localStorage.getItem("saved") || "[]" );
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
 }
 
 export function saveListing(listing: any) {
   if (typeof window === "undefined") return;
 
-  const saved = JSON.parse(localStorage.getItem("saved") || "[]");
+  const saved = getSavedListings();
 
-  saved.push({
-    ...listing,
-    savedAt: Date.now(),
-  });
-
-  localStorage.setItem("saved", JSON.stringify(saved));
+  if (!saved.find((l) => l.id === listing.id)) {
+    saved.push(listing);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  }
 }
 
-export function removeListing(id: string | number) {
+export function removeListing(id: string) {
   if (typeof window === "undefined") return;
 
-  let saved = getSavedListings();
-  saved = saved.filter((item: any) => item.id !== id);
+  const updated = getSavedListings().filter((l) => l.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+}
 
-  localStorage.setItem("saved", JSON.stringify(saved));
+export function isListingSaved(id: string) {
+  return getSavedListings().some((l) => l.id === id);
 }
