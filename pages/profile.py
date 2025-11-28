@@ -1,70 +1,153 @@
 import streamlit as st
-from login import Client
-from signup import NewClient
+from firebase_utils import get_firebase
 
-st.set_page_config(page_title="User Account", page_icon="👤")
-st.title("👤 Manje Rentals — Account Portal")
+# ------------------------------------------------------------------------------
+# Page config
+# ------------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Manje Rentals – Profile",
+    page_icon="🏠",
+    layout="wide"
+)
 
-# Dashboard Function
-def show_dashboard():
-    """Display the profile/dashboard page for logged-in users."""
-    st.success(f"Welcome, {st.session_state['user_email']}!")
+# ------------------------------------------------------------------------------
+# Firebase
+# ------------------------------------------------------------------------------
+auth, db = get_firebase()
 
-    # --- Saved Listings Section ---
-    st.header("Saved Listings")
-    # TODO: Replace with actual database query for saved listings
-    saved_listings = ["Apartment 1", "Apartment 2", "Apartment 3"]
-    if saved_listings:
-        for listing in saved_listings:
-            st.write(f"🏠 {listing}")
-    else:
-        st.write("You have no saved listings yet.")
+# ------------------------------------------------------------------------------
+# Header
+# ------------------------------------------------------------------------------
+st.markdown(
+    """
+    <h1 style='text-align: center; color: #2C3E50;'>🏠 MANJE RENTALS</h1>
+    <h3 style='text-align: center; color: #5D6D7E;'>
+        <i>Your profile & saved rentals.</i>
+    </h3>
+    <hr style='margin-top: 10px; margin-bottom: 30px;'>
+    """,
+    unsafe_allow_html=True
+)
 
-    # --- Account Details Section ---
-    st.header("Account Details")
-    # Example details, can be fetched from database
-    st.text(f"Email: {st.session_state['user_email']}")
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
+def require_login():
+    """Ensure user is logged in; otherwise show message and stop."""
+    if "user" not in st.session_state:
+        st.warning("You must be logged in to view your profile. Go to the **Sign up** page to log in.")
+        st.stop()
+    return st.session_state["user"]
 
-    # Logout
-    if st.button("Logout"):
-        del st.session_state["user_email"]
-        st.success("Logged out successfully.")
+
+def load_user_data(uid, id_token):
+    """Load the current user's profile document from Firebase."""
+    try:
+        snapshot = db.child("users").child(uid).get(id_token)
+        return snapshot.val()
+    except Exception as e:
+        st.error("Could not load your profile from the database. "
+                 "Try logging out and logging back in.")
+        st.text(f"Debug info: {e}")
+        st.stop()
 
 
-# Main Function
-if "user_email" in st.session_state:
-    # User is logged in
-    show_dashboard()
-else:
-    # Login / Sign Up selection
-    option = st.radio("Select Option", ["Login", "Sign Up"])
+def clear_saved_listings(uid, id_token):
+    """Delete all saved listings for this user."""
+    try:
+        db.child("users").child(uid).child("saved_listings").remove(id_token)
+    except Exception as e:
+        st.error("Could not clear saved listings. Please try again.")
+        st.text(f"Debug info: {e}")
 
-    if option == "Login":
-        st.subheader("Login")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
 
-        if st.button("Login"):
-            client = Client(email, password)
-            if client.find_email_db():
-                st.session_state["user_email"] = email
-                st.success("✅ Login successful!")
-                show_dashboard()
-            else:
-                st.error("❌ Invalid email or password")
+# ------------------------------------------------------------------------------
+# Main Profile Page
+# ------------------------------------------------------------------------------
+def profile_page():
+    # 1) Ensure user is logged in
+    user = require_login()
+    uid = user["uid"]
+    id_token = user["idToken"]
 
-    elif option == "Sign Up":
-        st.subheader("Create Account")
-        first = st.text_input("First Name")
-        last = st.text_input("Last Name")
-        email = st.text_input("Email")
-        confirm_email = st.text_input("Confirm Email")
-        password = st.text_input("Password", type="password")
-        confirm_password = st.text_input("Confirm Password", type="password")
+    # 2) Load profile data from Firebase
+    user_data = load_user_data(uid, id_token) or {}
 
-        if st.button("Create Account"):
-            user = NewClient(first, last, email, confirm_email, password, confirm_password)
-            if user.add_user_to_db():
-                st.success("✅ Account created! Please log in.")
-            else:
-                st.error("❌ Could not create account.")
+    first_name = user_data.get("first_name", "")
+    last_name = user_data.get("last_name", "")
+    full_name = user_data.get("full_name") or f"{first_name} {last_name}".strip()
+    email = user_data.get("email", "")
+
+    # 3) Layout: left column for profile info, right for saved listings
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.subheader("👤 Your Information")
+        if full_name:
+            st.write(f"**Name:** {full_name}")
+        else:
+            st.write("**Name:** (not set)")
+
+        st.write(f"**Email:** {email}")
+
+        # Simple future extension: editable names
+        # if st.checkbox("Edit name"):
+        #     new_first = st.text_input("First name", value=first_name or "")
+        #     new_last = st.text_input("Last name", value=last_name or "")
+        #     if st.button("Save name"):
+        #         db.child("users").child(uid).update(
+        #             {"first_name": new_first, "last_name": new_last,
+        #              "full_name": f\"{new_first} {new_last}\"},
+        #             id_token
+        #         )
+        #         st.success("Name updated. Reloading...")
+        #         st.rerun()
+
+        if st.button("Log out"):
+            st.session_state.pop("user", None)
+            st.rerun()
+
+    with col2:
+        st.subheader("⭐ Saved Listings")
+
+        saved = user_data.get("saved_listings") or {}
+
+        if not saved:
+            st.info("You haven't saved any listings yet. "
+                    "Go to the map and click **Save** on a listing you like.")
+        else:
+            # Button to clear everything
+            if st.button("Clear all saved listings"):
+                clear_saved_listings(uid, id_token)
+                st.success("Saved listings cleared.")
+                st.rerun()
+
+            st.markdown("---")
+
+            # Flexible handling: work whether saved_listings is
+            # {id: True} or {id: {title, price, ...}}
+            for listing_id, listing_value in saved.items():
+                if isinstance(listing_value, dict):
+                    title = listing_value.get("title", f"Listing {listing_id}")
+                    price = listing_value.get("price", None)
+                    address = listing_value.get("address", "")
+                    url = listing_value.get("url", None)
+                    beds = listing_value.get("bedrooms", None)
+                    baths = listing_value.get("bathrooms", None)
+
+                    with st.expander(f"{title} (ID: {listing_id})"):
+                        if price is not None:
+                            st.write(f"**Price:** ${price}")
+                        if beds is not None or baths is not None:
+                            st.write(f"**Bedrooms/Bathrooms:** {beds} / {baths}")
+                        if address:
+                            st.write(f"**Address:** {address}")
+                        if url:
+                            st.write(f"[View original listing]({url})")
+
+                else:
+                    # Fallback if you only stored a boolean or simple flag
+                    st.write(f"- Listing ID: `{listing_id}`")
+
+# Run page
+profile_page()
