@@ -1,100 +1,139 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSavedListings, removeListing } from "@/utils/saved";
+import { useSavedListings } from "@/hooks/useSavedListings";
 
-// Browser scraper using corsproxy.io
-async function fetchPreviewBrowser(url: string) {
+// ------------------------------------------------------
+// PREVIEW SCRAPER + LOCAL CACHE
+// ------------------------------------------------------
+const PREVIEW_CACHE_KEY = "manje_preview_cache_v1";
+
+function getCachedPreview(url?: string | null): string | null {
+  if (typeof window === "undefined" || !url) return null;
   try {
-    const proxy = "https://corsproxy.io/?";
-    const full = proxy + encodeURIComponent(url);
-
-    const html = await fetch(full).then((res) => res.text());
-    const doc = new DOMParser().parseFromString(html, "text/html");
-
-    const og = doc.querySelector('meta[property="og:image"]')?.content;
-    const tw = doc.querySelector('meta[name="twitter:image"]')?.content;
-
-    return og || tw || null;
+    const raw = localStorage.getItem(PREVIEW_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const val = data[url];
+    return typeof val === "string" && val.trim() ? val : null;
   } catch {
     return null;
   }
 }
 
-function getImg(ls: any) {
-  return (
-    ls.preview ||
-    ls.image ||
-    (Array.isArray(ls.Images) ? ls.Images[0] : null) ||
-    null
-  );
+function setCachedPreview(url: string, preview: string) {
+  if (typeof window === "undefined" || !url || !preview) return;
+  try {
+    const raw = localStorage.getItem(PREVIEW_CACHE_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    data[url] = preview;
+    localStorage.setItem(PREVIEW_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
 }
 
+async function fetchPreviewBrowser(url?: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const proxy = "https://corsproxy.io/?";
+    const fullURL = proxy + encodeURIComponent(url);
+
+    const html = await fetch(fullURL).then((res) => res.text());
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const og = doc.querySelector('meta[property="og:image"]')?.getAttribute("content") || "";
+    const tw = doc.querySelector('meta[name="twitter:image"]')?.getAttribute("content") || "";
+
+    const best = og || tw;
+    if (best && best.trim()) return best.trim();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensurePreview(ls: any): Promise<any> {
+  if (ls.preview && typeof ls.preview === "string" && ls.preview.trim()) {
+    return ls;
+  }
+  if (!ls.url) return ls;
+
+  const cached = getCachedPreview(ls.url);
+  if (cached) return { ...ls, preview: cached };
+
+  const preview = await fetchPreviewBrowser(ls.url);
+  if (preview) {
+    setCachedPreview(ls.url, preview);
+    return { ...ls, preview };
+  }
+
+  return ls;
+}
+
+function getImg(ls: any) {
+  if (!ls) return null;
+  if (typeof ls.preview === "string" && ls.preview.trim()) return ls.preview;
+  if (typeof ls.image === "string" && ls.image.trim()) return ls.image;
+  if (Array.isArray(ls.Images) && ls.Images[0]) return ls.Images[0];
+  return null;
+}
+
+// ------------------------------------------------------
+// PAGE
+// ------------------------------------------------------
 export default function SavedPage() {
+  const { savedListings, removeListing, loading } = useSavedListings();
   const [listings, setListings] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
-
-  //  Restore ALL sort options
   const [sortKey, setSortKey] = useState("date-desc");
 
+  // When savedListings changes from Firestore, enrich with previews
   useEffect(() => {
-    const data = getSavedListings();
-    setListings(data);
-    fetchPreviews(data);
-  }, []);
-
-  async function fetchPreviews(list: any[]) {
-    const updated = await Promise.all(
-      list.map(async (ls) => {
-        if (ls.preview) return ls;
-        const preview = await fetchPreviewBrowser(ls.url);
-        return { ...ls, preview };
-      })
-    );
-
-    setListings(updated);
-    localStorage.setItem("manje_saved_listings", JSON.stringify(updated));
-  }
+    async function hydrate() {
+      const enhanced = await Promise.all(savedListings.map((ls) => ensurePreview(ls)));
+      setListings(enhanced);
+    }
+    hydrate();
+  }, [savedListings]);
 
   function removeItem(id: string) {
     removeListing(id);
-    const updated = getSavedListings();
-    setListings(updated);
     if (selected?.id === id) setSelected(null);
   }
 
-  // FULL SORTING LOGIC (RESTORED)
   const sorted = [...listings].sort((a, b) => {
     switch (sortKey) {
       case "price-asc":
-        return a.price - b.price;
+        return (a.price || 0) - (b.price || 0);
       case "price-desc":
-        return b.price - a.price;
-
+        return (b.price || 0) - (a.price || 0);
       case "size-asc":
         return (a.sqft || 0) - (b.sqft || 0);
       case "size-desc":
         return (b.sqft || 0) - (a.sqft || 0);
-
       case "bedrooms":
         return (b.bedrooms || 0) - (a.bedrooms || 0);
-
       case "bathrooms":
         return (b.bathrooms || 0) - (a.bathrooms || 0);
-
       case "date-asc":
-        return a.savedAt - b.savedAt;
+        return (a.savedAt || 0) - (b.savedAt || 0);
       case "date-desc":
-        return b.savedAt - a.savedAt;
-
+        return (b.savedAt || 0) - (a.savedAt || 0);
       default:
         return 0;
     }
   });
 
+  if (loading)
+    return (
+      <div className="min-h-screen bg-black text-white pt-24 text-center">
+        Loading saved listings...
+      </div>
+    );
+
   return (
     <main className="flex min-h-screen bg-black text-white pt-24">
-      
       {/* LEFT SORT PANEL */}
       <aside className="w-80 bg-gray-900 p-6 rounded-xl mr-4 space-y-6 h-fit">
         <h2 className="text-xl font-bold uppercase">Sort Listings</h2>
@@ -221,8 +260,9 @@ export default function SavedPage() {
               >
                 {getImg(ls) && (
                   <img
-                    src={getImg(ls)}
+                    src={getImg(ls)!}
                     className="w-full h-40 object-cover rounded-lg mb-3"
+                    alt={ls.title}
                   />
                 )}
 
@@ -251,24 +291,39 @@ export default function SavedPage() {
           <p className="text-gray-500">Click a listing to view details.</p>
         ) : (
           <div className="space-y-3">
-
             {getImg(selected) && (
               <img
-                src={getImg(selected)}
+                src={getImg(selected)!}
                 className="w-full h-48 object-cover rounded-lg mb-4"
+                alt={selected.title}
               />
             )}
 
             <h2 className="text-2xl font-bold">{selected.title}</h2>
 
-            <p><strong>Price:</strong> ${selected.price}</p>
-            <p><strong>Bedrooms:</strong> {selected.bedrooms}</p>
-            <p><strong>Bathrooms:</strong> {selected.bathrooms}</p>
-            <p><strong>Sqft:</strong> {selected.sqft || "N/A"}</p>
-            <p><strong>Location:</strong><br />{selected.address}</p>
+            <p>
+              <strong>Price:</strong> ${selected.price}
+            </p>
+            <p>
+              <strong>Bedrooms:</strong> {selected.bedrooms}
+            </p>
+            <p>
+              <strong>Bathrooms:</strong> {selected.bathrooms}
+            </p>
+            <p>
+              <strong>Sqft:</strong> {selected.sqft || "N/A"}
+            </p>
+            <p>
+              <strong>Location:</strong>
+              <br />
+              {selected.address}
+            </p>
 
             <button
-              onClick={() => removeItem(selected.id)}
+              onClick={() => {
+                removeItem(selected.id);
+                setSelected(null);
+              }}
               className="w-full py-2 bg-red-600 hover:bg-red-700 rounded-lg font-semibold"
             >
               Remove from Saved
@@ -278,13 +333,13 @@ export default function SavedPage() {
               href={selected.url}
               target="_blank"
               className="block text-center mt-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold"
+              rel="noreferrer"
             >
               View Original Listing
             </a>
           </div>
         )}
       </aside>
-
     </main>
   );
 }
