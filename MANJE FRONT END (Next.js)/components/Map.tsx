@@ -43,7 +43,6 @@ const condoIcon = L.icon({
   iconAnchor: [20, 40],
 });
 
-// MULTIPLE LISTINGS ICON (your custom PNG)
 const multiIcon = L.icon({
   iconUrl: "/icons/multi.png",
   iconSize: [45, 45],
@@ -51,10 +50,10 @@ const multiIcon = L.icon({
 });
 
 // Pick correct icon
-function getIcon(type: string, count: number) {
+function getIcon(type: string | undefined, count: number) {
   if (count > 1) return multiIcon;
 
-  const t = type.toLowerCase();
+  const t = (type || "").toLowerCase();
   if (t.includes("house")) return houseIcon;
   if (t.includes("apartment")) return apartmentIcon;
   if (t.includes("condo")) return condoIcon;
@@ -65,7 +64,13 @@ function getIcon(type: string, count: number) {
 // ------------------------------------------------------
 // MAP COMPONENT
 // ------------------------------------------------------
-export default function ListingMap({ listings, onSelectListing }: any) {
+export default function ListingMap({
+  listings,
+  onSelectListing,
+}: {
+  listings: any[];
+  onSelectListing: (listing: any) => void;
+}) {
   const safe = Array.isArray(listings) ? listings : [];
 
   // Group listings by exact coordinates
@@ -73,7 +78,11 @@ export default function ListingMap({ listings, onSelectListing }: any) {
     const map: Record<string, any[]> = {};
 
     safe.forEach((l) => {
-      const key = `${l.latitude},${l.longitude}`;
+      const lat = Number(l.latitude);
+      const lon = Number(l.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const key = `${lat},${lon}`;
       if (!map[key]) map[key] = [];
       map[key].push(l);
     });
@@ -98,7 +107,7 @@ export default function ListingMap({ listings, onSelectListing }: any) {
           <Marker
             key={key}
             position={[lat, lon]}
-            icon={getIcon(group[0].Type, count)}
+            icon={getIcon(group[0]?.Type, count)}
             eventHandlers={{
               click: () => {
                 if (count === 1) {
@@ -115,18 +124,18 @@ export default function ListingMap({ listings, onSelectListing }: any) {
             <Popup>
               {count === 1 ? (
                 <>
-                  <b>{group[0].Title}</b><br />
-                  ${group[0].Price}<br />
-                  {group[0].Bedrooms} Beds • {group[0].Bathrooms} Baths
+                  <b>{group[0]?.Title}</b>
+                  <br />
+                  ${group[0]?.Price}
+                  <br />
+                  {group[0]?.Bedrooms} Beds • {group[0]?.Bathrooms} Baths
                 </>
               ) : (
                 <>
                   <b>{count} Listings Here</b>
                   <ul>
                     {group.map((l: any) => (
-                      <li key={l.id}>
-                        — ${l.Price}
-                      </li>
+                      <li key={l.id}>— ${l?.Price}</li>
                     ))}
                   </ul>
                 </>
@@ -138,4 +147,3 @@ export default function ListingMap({ listings, onSelectListing }: any) {
     </MapContainer>
   );
 }
-
