@@ -1,48 +1,83 @@
 "use client";
 
 import { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "@/firebaseConfig";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore"; // Import Firestore functions
+import { auth, db } from "@/firebaseConfig";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
-  async function handleRegister(e) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
+    // Basic Validation (matching your Python script)
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     try {
+      // 1. Create Auth User
       const res = await createUserWithEmailAndPassword(auth, email, password);
+      const user = res.user;
 
-      // Add name to user profile
-      await updateProfile(res.user, { displayName: name });
+      // 2. Create User Profile in Firestore
+      // This replaces the Python: db.child("users").child(uid).set(...)
+      await setDoc(doc(db, "users", user.uid), {
+        firstName: firstName,
+        lastName: lastName,
+        fullName: `${firstName} ${lastName}`,
+        email: email,
+        savedListings: [] // Initialize empty array
+      });
 
+      // Redirect to profile
       router.push("/profile");
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === "auth/email-already-in-use") {
+        setError("An account with this email already exists.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Password is too weak.");
+      } else {
+        setError(err.message);
+      }
     }
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white">
       <div className="bg-gray-900 p-8 rounded-xl w-96 border border-gray-800">
-        <h1 className="text-3xl font-bold mb-6 text-center">Register</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">Sign Up</h1>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Full Name"
-            className="w-full p-3 bg-gray-800 rounded border border-gray-700"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="First Name"
+              className="w-1/2 p-3 bg-gray-800 rounded border border-gray-700"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Last Name"
+              className="w-1/2 p-3 bg-gray-800 rounded border border-gray-700"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          </div>
 
           <input
             type="email"
@@ -59,6 +94,15 @@ export default function RegisterPage() {
             className="w-full p-3 bg-gray-800 rounded border border-gray-700"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            className="w-full p-3 bg-gray-800 rounded border border-gray-700"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
 
