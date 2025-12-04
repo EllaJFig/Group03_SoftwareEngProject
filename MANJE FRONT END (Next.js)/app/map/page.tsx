@@ -1,16 +1,18 @@
 "use client";
 
+// Imports
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getAllListings } from "@/utils/firestore";
 import { smartLocalGeocode, extractPostal } from "@/utils/localGeocode";
 
+// Import Map Content
 const ListingMap = dynamic(() => import("@/components/Map"), { ssr: false });
 
-// SAME STORAGE KEY FOR SAVING PREVIEWS
+// Storage Key for Saving Previers
 const STORAGE_KEY = "manje_saved_listings";
 
-// ⭐ image helper
+// Extract image URL from a listing object
 function getListingImage(listing: any) {
   return (
     listing?.preview ||
@@ -21,7 +23,7 @@ function getListingImage(listing: any) {
   );
 }
 
-// ⭐ dedupe logic (URL → Location → ID)
+// remove duplicate listings
 function dedupeListings(listings: any[]) {
   const seen = new Map();
   for (const l of listings) {
@@ -56,7 +58,7 @@ export default function MapPage() {
     }
   });
 
-  // ⭐ SAVE/UNSAVE
+  // SAVE/UNSAVE
   function toggleSave(listing: any) {
     const stored: any[] = JSON.parse(
       localStorage.getItem("manje_saved_listings") || "[]"
@@ -88,7 +90,7 @@ export default function MapPage() {
     setSaved(updated.map((x) => x.id));
   }
 
-  // ⭐ 1. load and geocode listings (FAST)
+  // 1. load and geocode listings (FAST)
   useEffect(() => {
     async function load() {
       let raw = await getAllListings();
@@ -115,7 +117,7 @@ export default function MapPage() {
     load();
   }, []);
 
-  // ⭐ 2. fetch preview images in the BACKGROUND
+  // 2. fetch preview images in the BACKGROUND
   async function fetchPreviewImages(listingsArr: any[]) {
     const updated = await Promise.all(
       listingsArr.map(async (l) => {
@@ -143,7 +145,7 @@ export default function MapPage() {
     setFiltered(updated);
   }
 
-  // ⭐ 3. filters
+  // 3. filters
   function applyFilters() {
     let data = [...listings];
 
