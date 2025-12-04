@@ -25,7 +25,6 @@ export default function ProfilePage() {
   }, [user, loading, router]);
 
   async function fetchUserData(uid: string) {
-    // Replicates Python: db.child("users").child(uid).get()
     const docRef = doc(db, "users", uid);
     const docSnap = await getDoc(docRef);
 
