@@ -13,7 +13,8 @@ export default function ProfilePage() {
   // Check if the user is logged in
   const { user, loading } = useAuth();
   const router = useRouter();
-  
+
+  // Store user profile data
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -24,22 +25,25 @@ export default function ProfilePage() {
     }
   }, [user, loading, router]);
 
+  // Fetch user details from Firestore
   async function fetchUserData(uid: string) {
     const docRef = doc(db, "users", uid);
     const docSnap = await getDoc(docRef);
 
+    // Fetch document snapshot
     if (docSnap.exists()) {
       setUserData(docSnap.data());
     }
   }
 
+  // Handle user logout
   async function handleLogout() {
     await signOut(auth);
     router.push("/login");
   }
-
   if (loading || !userData) return <div className="p-12 text-white">Loading...</div>;
 
+  // Page Layout
   return (
     <main className="min-h-screen bg-black text-white p-12 flex justify-center pt-24">
       <div className="max-w-3xl w-full space-y-10">
