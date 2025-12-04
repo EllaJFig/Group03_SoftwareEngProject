@@ -1,6 +1,5 @@
 "use client";
 
-// Imports
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"; // Import Firestore functions
@@ -10,33 +9,30 @@ import { useRouter } from "next/navigation";
 export default function RegisterPage() {
   const router = useRouter();
 
-  // State Variables for the user input
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Error messages
   const [error, setError] = useState("");
 
-// Button Click
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    // Make sure password matches confirm password
+    // Basic Validation (matching your Python script)
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
     try {
-      // Create user profile and wait until it is created in Firebase before proceeding
+      // 1. Create Auth User
       const res = await createUserWithEmailAndPassword(auth, email, password);
       const user = res.user;
 
-      // Save profile info into database
+      // 2. Create User Profile in Firestore
+      // This replaces the Python: db.child("users").child(uid).set(...)
       await setDoc(doc(db, "users", user.uid), {
         firstName: firstName,
         lastName: lastName,
@@ -45,27 +41,19 @@ export default function RegisterPage() {
         savedListings: [] // Initialize empty array
       });
 
-      // Redirect to profile page
+      // Redirect to profile
       router.push("/profile");
     } catch (err: any) {
-
-      // Account has already been created with this email
       if (err.code === "auth/email-already-in-use") {
         setError("An account with this email already exists.");
-      } 
-      // Password is not strong enough
-      else if (err.code === "auth/weak-password") {
+      } else if (err.code === "auth/weak-password") {
         setError("Password is too weak.");
-      } 
-      
-      // Catch all the other cases
-      else {
+      } else {
         setError(err.message);
       }
     }
   }
 
-  // User Interface
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white">
       <div className="bg-gray-900 p-8 rounded-xl w-96 border border-gray-800">
